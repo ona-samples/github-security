@@ -12,36 +12,6 @@ permissions:
   contents: read
 
 jobs:
-  image-scan:
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    name: Image Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build image from .devcontainer/Dockerfile
-        run: |
-          docker build -t ghcr.io/ona-samples/github-security:${{ github.sha }} -f .devcontainer/Dockerfile .
-
-      - name: Run Trivy image scanner
-        uses: aquasecurity/trivy-action@0.35.0
-        with:
-          image-ref: 'ghcr.io/ona-samples/github-security:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-image-results.sarif'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload image scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-image-results.sarif'
-          category: 'trivy-image'
-
   fs-scan:
     permissions:
       contents: read
