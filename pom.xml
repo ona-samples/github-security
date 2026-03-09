@@ -24,6 +24,7 @@
     <webjars-bootstrap.version>5.3.8</webjars-bootstrap.version>
     <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
 
+    <logback.version>1.5.25</logback.version>
     <checkstyle.version>12.1.2</checkstyle.version>
     <jacoco.version>0.8.14</jacoco.version>
     <libsass.version>0.3.4</libsass.version>
