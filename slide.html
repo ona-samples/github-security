@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Security + Ona</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .slide {
+    max-width: 960px;
+    width: 100%;
+  }
+
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2.5rem;
+    line-height: 1.2;
+  }
+
+  h1 span {
+    color: #22c55e;
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #262626;
+  }
+
+  .problem .section-label { color: #ef4444; }
+  .solution .section-label { color: #22c55e; }
+
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    margin-top: 2rem;
+  }
+
+  ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  li {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    color: #d4d4d4;
+  }
+
+  li .icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    margin-top: 0.15rem;
+  }
+
+  .problem li .icon {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  .solution li .icon {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+  }
+
+  li strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .result {
+    margin-top: 3rem;
+    padding: 1.25rem 1.5rem;
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 0.5rem;
+    font-size: 1.1rem;
+    color: #d4d4d4;
+    text-align: center;
+  }
+
+  .result strong {
+    color: #22c55e;
+  }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <h1>GitHub Security + <span>Ona</span></h1>
+
+    <div class="columns">
+      <div class="problem">
+        <div class="section-label">The problem</div>
+        <ul>
+          <li>
+            <div class="icon">&#x2715;</div>
+            <div><strong>Growing backlog</strong> — scanners find vulnerabilities faster than teams can fix them</div>
+          </li>
+          <li>
+            <div class="icon">&#x2715;</div>
+            <div><strong>Security fixes feel like toil</strong> — developers deprioritize repetitive dependency bumps and low-level code changes</div>
+          </li>
+          <li>
+            <div class="icon">&#x2715;</div>
+            <div><strong>Auto-generated PRs break things</strong> — text search-and-replace produces changes that are insufficiently tested or don't compile</div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="solution">
+        <div class="section-label">How Ona fixes this</div>
+        <ul>
+          <li>
+            <div class="icon">&#x2713;</div>
+            <div><strong>AI software engineer</strong> — analyzes each finding and crafts a reasoned fix, not a regex substitution</div>
+          </li>
+          <li>
+            <div class="icon">&#x2713;</div>
+            <div><strong>Real dev environment</strong> — the fix is built and tested where the code can actually compile and run</div>
+          </li>
+          <li>
+            <div class="icon">&#x2713;</div>
+            <div><strong>Iterates until proven</strong> — if tests fail, the agent reads errors, adjusts, and retries</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="result">
+      The result: a PR that is <strong>ready to review and merge</strong>, not a starting point that needs manual cleanup.
+    </div>
+  </div>
+</body>
+</html>
