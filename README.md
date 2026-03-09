@@ -1,173 +1,123 @@
-# Spring PetClinic Sample Application [![Build Status](https://github.com/spring-projects/spring-petclinic/actions/workflows/maven-build.yml/badge.svg)](https://github.com/spring-projects/spring-petclinic/actions/workflows/maven-build.yml)[![Build Status](https://github.com/spring-projects/spring-petclinic/actions/workflows/gradle-build.yml/badge.svg)](https://github.com/spring-projects/spring-petclinic/actions/workflows/gradle-build.yml)
+# GitHub Security + Ona Automations
 
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/spring-projects/spring-petclinic) [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=7517918)
+Security scanners are good at finding vulnerabilities. Fixing them is the hard part. Teams accumulate a backlog of findings that grows faster than developers can address it. Developers see security fixes as toil. And tools that auto-generate PRs via text search-and-replace often produce changes that are insufficiently tested or break the application — creating more work, not less.
 
-## Understanding the Spring Petclinic application with a few diagrams
+[Ona](https://ona.com) takes a different approach:
 
-See the presentation here:  
-[Spring Petclinic Sample Application (legacy slides)](https://speakerdeck.com/michaelisvy/spring-petclinic-sample-application?slide=20)
+- An **AI software engineer** analyzes each finding and crafts the code change — not a regex substitution, but a reasoned fix that accounts for the project's structure and conventions.
+- The fix is **built and tested in a fully equipped dev environment** where the modified code can actually compile and run.
+- The agent **iterates until the fix is proven not to break the app** — if tests fail, it reads the errors, adjusts, and retries.
 
-> **Note:** These slides refer to a legacy, pre–Spring Boot version of Petclinic and may not reflect the current Spring Boot–based implementation.  
-> For up-to-date information, please refer to this repository and its documentation.
+The result is a PR that is ready to review and merge, not a starting point that needs manual cleanup.
 
+This repo demonstrates the setup using [Spring PetClinic](https://github.com/spring-projects/spring-petclinic) (Java/Maven) with GitHub's free security features.
 
-## Run Petclinic locally
+## Security scanning tools
 
-Spring Petclinic is a [Spring Boot](https://spring.io/guides/gs/spring-boot) application built using [Maven](https://spring.io/guides/gs/maven/) or [Gradle](https://spring.io/guides/gs/gradle/).
-Java 17 or later is required for the build, and the application can run with Java 17 or newer.
+All tools below are free for public repos on GitHub's free org plan.
 
-You first need to clone the project locally:
+### Dependabot alerts
 
-```bash
-git clone https://github.com/spring-projects/spring-petclinic.git
-cd spring-petclinic
+Dependabot monitors your dependency graph for known vulnerabilities and creates alerts under **Security > Dependabot**.
+
+For Maven projects, GitHub's dependency graph often can't resolve versions inherited from a parent BOM. The [`dependency-submission.yml`](.github/workflows/dependency-submission.yml) workflow solves this by running `mvn` to resolve the full dependency tree and submitting it to GitHub's dependency graph API.
+
+### Code scanning (CodeQL)
+
+[CodeQL](https://codeql.github.com/) performs static analysis on your source code. GitHub's default setup analyzes Java and Actions code on every push and PR. Results appear under **Security > Code scanning**.
+
+### Trivy (filesystem scan)
+
+[Trivy](https://github.com/aquasecurity/trivy) scans dependency files (pom.xml, lock files, etc.) for known CVEs. The [`trivy.yml`](.github/workflows/trivy.yml) workflow runs a filesystem scan and uploads SARIF results to **Security > Code scanning**.
+
+### OSV-Scanner
+
+[OSV-Scanner](https://github.com/google/osv-scanner) checks dependencies against the [OSV database](https://osv.dev/). The [`osv-scanner.yml`](.github/workflows/osv-scanner.yml) workflow runs on push (scheduled scan) and on PRs (diff scan to catch newly introduced vulnerabilities). Results upload to **Security > Code scanning**.
+
+## Ona automations
+
+Two Ona automations in [`.ona/`](.ona/) use the GitHub CLI to fetch the highest-severity open alert, apply a fix, run tests, and open a PR.
+
+### `fix-dependabot-alert`
+
+[`.ona/fix-dependabot-alert.yaml`](.ona/fix-dependabot-alert.yaml)
+
+1. **Install gh CLI** if not present
+2. **Fetch** the highest-severity open Dependabot alert via `gh api`
+3. **Analyze** the alert and read the manifest to understand how the dependency is declared
+4. **Upgrade** the dependency to the patched version
+5. **Verify** with `./mvnw compile test` and `./mvnw dependency:tree`
+6. **Open a PR** with alert details, CVE, CVSS score, and verification checklist
+
+### `fix-codescan-alert`
+
+[`.ona/fix-codescan-alert.yaml`](.ona/fix-codescan-alert.yaml)
+
+1. **Install gh CLI** if not present
+2. **Fetch** the highest-severity open code scanning alert via `gh api`
+3. **Analyze** the alert, read the affected source file and context
+4. **Fix** the issue (code change for CodeQL findings, dependency upgrade for Trivy/OSV findings)
+5. **Verify** with `./mvnw compile test`
+6. **Open a PR** with alert details and verification checklist
+
+Both automations authenticate using the token from the git credential helper (`GITHUB_TOKEN` env var), avoiding the need for additional secrets.
+
+## Set up on your own repo
+
+### 1. Enable security scanning
+
+Set up scanners so that alerts appear under **Security** in your GitHub repo. This repo uses Dependabot, CodeQL, Trivy, and OSV-Scanner — see the [`.github/workflows/`](.github/workflows/) directory for examples. Use whichever combination fits your project.
+
+GitHub docs:
+- [Dependabot alerts](https://docs.github.com/en/code-security/dependabot/dependabot-alerts/configuring-dependabot-alerts)
+- [Code scanning (CodeQL)](https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning)
+- [Third-party SARIF uploads](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github) (Trivy, OSV-Scanner, etc.)
+
+### 2. Add Ona automations
+
+Copy the two automation files into your repo:
+
 ```
-If you are using Maven, you can start the application on the command-line as follows:
-
-```bash
-./mvnw spring-boot:run
-```
-With Gradle, the command is as follows:
-
-```bash
-./gradlew bootRun
-```
-
-You can then access the Petclinic at <http://localhost:8080/>.
-
-<img width="1042" alt="petclinic-screenshot" src="https://cloud.githubusercontent.com/assets/838318/19727082/2aee6d6c-9b8e-11e6-81fe-e889a5ddfded.png">
-
-You can, of course, run Petclinic in your favorite IDE.
-See below for more details.
-
-## Building a Container
-
-There is no `Dockerfile` in this project. You can build a container image (if you have a docker daemon) using the Spring Boot build plugin:
-
-```bash
-./mvnw spring-boot:build-image
-```
-
-## In case you find a bug/suggested improvement for Spring Petclinic
-
-Our issue tracker is available [here](https://github.com/spring-projects/spring-petclinic/issues).
-
-## Database configuration
-
-In its default configuration, Petclinic uses an in-memory database (H2) which
-gets populated at startup with data. The h2 console is exposed at `http://localhost:8080/h2-console`,
-and it is possible to inspect the content of the database using the `jdbc:h2:mem:<uuid>` URL. The UUID is printed at startup to the console.
-
-A similar setup is provided for MySQL and PostgreSQL if a persistent database configuration is needed. Note that whenever the database type changes, the app needs to run with a different profile: `spring.profiles.active=mysql` for MySQL or `spring.profiles.active=postgres` for PostgreSQL. See the [Spring Boot documentation](https://docs.spring.io/spring-boot/how-to/properties-and-configuration.html#howto.properties-and-configuration.set-active-spring-profiles) for more detail on how to set the active profile.
-
-You can start MySQL or PostgreSQL locally with whatever installer works for your OS or use docker:
-
-```bash
-docker run -e MYSQL_USER=petclinic -e MYSQL_PASSWORD=petclinic -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=petclinic -p 3306:3306 mysql:9.5
-```
-
-or
-
-```bash
-docker run -e POSTGRES_USER=petclinic -e POSTGRES_PASSWORD=petclinic -e POSTGRES_DB=petclinic -p 5432:5432 postgres:18.1
-```
-
-Further documentation is provided for [MySQL](https://github.com/spring-projects/spring-petclinic/blob/main/src/main/resources/db/mysql/petclinic_db_setup_mysql.txt)
-and [PostgreSQL](https://github.com/spring-projects/spring-petclinic/blob/main/src/main/resources/db/postgres/petclinic_db_setup_postgres.txt).
-
-Instead of vanilla `docker` you can also use the provided `docker-compose.yml` file to start the database containers. Each one has a service named after the Spring profile:
-
-```bash
-docker compose up mysql
-```
-
-or
-
-```bash
-docker compose up postgres
+.ona/fix-dependabot-alert.yaml
+.ona/fix-codescan-alert.yaml
 ```
 
-## Test Applications
+Adjust the agent prompts if your project uses a different build tool (e.g., replace `./mvnw` with `./gradlew` or `npm`).
 
-At development time we recommend you use the test applications set up as `main()` methods in `PetClinicIntegrationTests` (using the default H2 database and also adding Spring Boot Devtools), `MySqlTestApplication` and `PostgresIntegrationTests`. These are set up so that you can run the apps in your IDE to get fast feedback and also run the same classes as integration tests against the respective database. The MySql integration tests use Testcontainers to start the database in a Docker container, and the Postgres tests use Docker Compose to do the same thing.
+#### Prerequisites
 
-## Compiling the CSS
+Log in to Ona before running any `ona ai` commands:
 
-There is a `petclinic.css` in `src/main/resources/static/resources/css`. It was generated from the `petclinic.scss` source, combined with the [Bootstrap](https://getbootstrap.com/) library. If you make changes to the `scss`, or upgrade Bootstrap, you will need to re-compile the CSS resources using the Maven profile "css", i.e. `./mvnw package -P css`. There is no build profile for Gradle to compile the CSS.
+```bash
+ona login
+```
 
-## Working with Petclinic in your IDE
+#### Install automations
 
-### Prerequisites
+Use the Ona CLI to register each automation:
 
-The following items should be installed in your system:
+```bash
+ona ai automation create .ona/fix-dependabot-alert.yaml
+ona ai automation create .ona/fix-codescan-alert.yaml
+```
 
-- Java 17 or newer (full JDK, not a JRE)
-- [Git command line tool](https://help.github.com/articles/set-up-git)
-- Your preferred IDE
-  - Eclipse with the m2e plugin. Note: when m2e is available, there is a m2 icon in `Help -> About` dialog. If m2e is
-  not there, follow the installation process [here](https://www.eclipse.org/m2e/)
-  - [Spring Tools Suite](https://spring.io/tools) (STS)
-  - [IntelliJ IDEA](https://www.jetbrains.com/idea/)
-  - [VS Code](https://code.visualstudio.com)
+#### Update automations
 
-### Steps
+After editing a YAML file, update the registered automation. First find the automation ID:
 
-1. On the command line run:
+```bash
+ona ai automation list
+```
 
-    ```bash
-    git clone https://github.com/spring-projects/spring-petclinic.git
-    ```
+Then apply the updated file:
 
-1. Inside Eclipse or STS:
+```bash
+ona ai automation update <automation-id> .ona/fix-dependabot-alert.yaml
+```
 
-    Open the project via `File -> Import -> Maven -> Existing Maven project`, then select the root directory of the cloned repo.
+#### Run automations
 
-    Then either build on the command line `./mvnw generate-resources` or use the Eclipse launcher (right-click on project and `Run As -> Maven install`) to generate the CSS. Run the application's main method by right-clicking on it and choosing `Run As -> Java Application`.
-
-1. Inside IntelliJ IDEA:
-
-    In the main menu, choose `File -> Open` and select the Petclinic [pom.xml](pom.xml). Click on the `Open` button.
-
-    - CSS files are generated from the Maven build. You can build them on the command line `./mvnw generate-resources` or right-click on the `spring-petclinic` project then `Maven -> Generates sources and Update Folders`.
-
-    - A run configuration named `PetClinicApplication` should have been created for you if you're using a recent Ultimate version. Otherwise, run the application by right-clicking on the `PetClinicApplication` main class and choosing `Run 'PetClinicApplication'`.
-
-1. Navigate to the Petclinic
-
-    Visit [http://localhost:8080](http://localhost:8080) in your browser.
-
-## Looking for something in particular?
-
-|Spring Boot Configuration | Class or Java property files  |
-|--------------------------|---|
-|The Main Class | [PetClinicApplication](https://github.com/spring-projects/spring-petclinic/blob/main/src/main/java/org/springframework/samples/petclinic/PetClinicApplication.java) |
-|Properties Files | [application.properties](https://github.com/spring-projects/spring-petclinic/blob/main/src/main/resources) |
-|Caching | [CacheConfiguration](https://github.com/spring-projects/spring-petclinic/blob/main/src/main/java/org/springframework/samples/petclinic/system/CacheConfiguration.java) |
-
-## Interesting Spring Petclinic branches and forks
-
-The Spring Petclinic "main" branch in the [spring-projects](https://github.com/spring-projects/spring-petclinic)
-GitHub org is the "canonical" implementation based on Spring Boot and Thymeleaf. There are
-[quite a few forks](https://spring-petclinic.github.io/docs/forks.html) in the GitHub org
-[spring-petclinic](https://github.com/spring-petclinic). If you are interested in using a different technology stack to implement the Pet Clinic, please join the community there.
-
-## Interaction with other open-source projects
-
-One of the best parts about working on the Spring Petclinic application is that we have the opportunity to work in direct contact with many Open Source projects. We found bugs/suggested improvements on various topics such as Spring, Spring Data, Bean Validation and even Eclipse! In many cases, they've been fixed/implemented in just a few days.
-Here is a list of them:
-
-| Name | Issue |
-|------|-------|
-| Spring JDBC: simplify usage of NamedParameterJdbcTemplate | [SPR-10256](https://github.com/spring-projects/spring-framework/issues/14889) and [SPR-10257](https://github.com/spring-projects/spring-framework/issues/14890) |
-| Bean Validation / Hibernate Validator: simplify Maven dependencies and backward compatibility |[HV-790](https://hibernate.atlassian.net/browse/HV-790) and [HV-792](https://hibernate.atlassian.net/browse/HV-792) |
-| Spring Data: provide more flexibility when working with JPQL queries | [DATAJPA-292](https://github.com/spring-projects/spring-data-jpa/issues/704) |
-
-## Contributing
-
-The [issue tracker](https://github.com/spring-projects/spring-petclinic/issues) is the preferred channel for bug reports, feature requests and submitting pull requests.
-
-For pull requests, editor preferences are available in the [editor config](.editorconfig) for easy use in common text editors. Read more and download plugins at <https://editorconfig.org>. All commits must include a __Signed-off-by__ trailer at the end of each commit message to indicate that the contributor agrees to the Developer Certificate of Origin.
-For additional details, please refer to the blog post [Hello DCO, Goodbye CLA: Simplifying Contributions to Spring](https://spring.io/blog/2025/01/06/hello-dco-goodbye-cla-simplifying-contributions-to-spring).
+Trigger them manually from the Ona dashboard or via the CLI. Each run picks the highest-severity open alert, fixes it, and opens a PR.
 
 ## License
 
