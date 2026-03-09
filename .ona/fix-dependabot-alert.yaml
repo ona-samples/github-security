@@ -1,0 +1,88 @@
+name: fix-dependabot-alert
+description: >-
+  Picks the highest-severity open Dependabot alert, upgrades the
+  vulnerable dependency, verifies tests pass, and opens a pull request.
+triggers:
+  - context:
+      projects: {}
+    manual: {}
+action:
+  limits:
+    maxParallel: 1
+    maxTotal: 10
+  steps:
+    # Step 1: Install gh CLI if not present
+    - task:
+        command: |
+          command -v gh && exit 0
+          curl -sL https://github.com/cli/cli/releases/latest/download/gh_2.74.0_linux_amd64.tar.gz | tar xz -C /tmp
+          sudo mv /tmp/gh_2.74.0_linux_amd64/bin/gh /usr/local/bin/gh
+    # Step 2: Fetch the highest-severity open Dependabot alert
+    - task:
+        command: |
+          export GITHUB_TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' | git credential fill | awk -F= '/password/{print $2}')
+          gh api repos/{owner}/{repo}/dependabot/alerts \
+            --jq '[.[] | select(.state=="open")] | sort_by(.security_advisory.cvss.score) | reverse | .[0]' \
+            > /tmp/dependabot-alert.json
+          cat /tmp/dependabot-alert.json
+    - agent:
+        prompt: |
+          Read /tmp/dependabot-alert.json which contains the highest-severity open
+          Dependabot alert. Extract the alert number, package name, vulnerable and
+          patched versions, CVE ID, CVSS score, and manifest file path.
+
+          If the file is empty, null, or contains no alert, output
+          "NO_ALERT: No open Dependabot alerts found." and stop.
+
+          Check whether the dependency is already at or above the patched version.
+          If so, output "ALREADY_FIXED: <package> is already at <version>." and stop.
+
+          Otherwise, apply the fix:
+          1. Read the manifest file to understand how the dependency is declared.
+          2. Upgrade the vulnerable dependency to the patched version (or newer).
+             - If the version is in `pom.xml` properties or directly, update it there.
+             - If inherited from a parent BOM, add an explicit version override.
+          3. Follow the project's existing conventions.
+
+          Do NOT commit or run tests yet.
+
+    - agent:
+        prompt: |
+          Verify the fix from the previous step:
+
+          1. Identify the project's build tool, test runner, and linter from the
+             repo config files.
+          2. Compile the project. If it fails, read the errors, fix them, and retry.
+          3. Find all test suites and verification commands that could exercise the
+             modified code. Run them.
+          4. If any check fails, determine whether the failure is caused by your
+             change or is pre-existing. Fix what you broke and rerun.
+          5. Repeat until all checks pass.
+          6. For dependency upgrades, confirm the vulnerable version is no longer
+             in the resolved dependency tree.
+
+    - pullRequest:
+        branch: dependabot-fix/
+        title: 'Dependabot-Fix: '
+        description: |
+          ## Dependabot Alert
+
+          | Field | Value |
+          |-------|-------|
+          | **Alert** | [View alert](https://github.com/ona-samples/github-security/security/dependabot/<alert-number>) |
+          | **CVE** | `<cve-id>` |
+          | **CVSS** | <cvss-score> |
+          | **Package** | `<package-name>` |
+          | **Vulnerable** | `<vulnerable-version>` |
+          | **Fixed** | `<patched-version>` |
+          | **Advisory** | <advisory-summary> |
+
+          ## What changed
+
+          <one-or-two-sentence explanation of the dependency upgrade and why it resolves the vulnerability>
+
+          ## Verification
+
+          <List each build, test, and lint command that was run and its outcome.
+          For dependency upgrades, state how you confirmed the vulnerable version
+          is no longer in the resolved dependency tree.>

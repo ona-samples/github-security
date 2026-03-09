@@ -1,0 +1,84 @@
+name: fix-codescan-alert
+description: >-
+  Picks the highest-severity open code scanning alert, applies a fix,
+  verifies tests pass, and opens a pull request.
+triggers:
+  - context:
+      projects: {}
+    manual: {}
+action:
+  limits:
+    maxParallel: 1
+    maxTotal: 10
+  steps:
+    # Step 1: Install gh CLI if not present
+    - task:
+        command: |
+          command -v gh && exit 0
+          curl -sL https://github.com/cli/cli/releases/latest/download/gh_2.74.0_linux_amd64.tar.gz | tar xz -C /tmp
+          sudo mv /tmp/gh_2.74.0_linux_amd64/bin/gh /usr/local/bin/gh
+    # Step 2: Fetch the highest-severity open code scanning alert
+    - task:
+        command: |
+          export GITHUB_TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' | git credential fill | awk -F= '/password/{print $2}')
+          gh api repos/{owner}/{repo}/code-scanning/alerts \
+            --jq '[.[] | select(.state=="open")] | sort_by(.rule.security_severity_level // "low") | reverse | .[0]' \
+            > /tmp/codescan-alert.json
+          cat /tmp/codescan-alert.json
+    - agent:
+        prompt: |
+          Read /tmp/codescan-alert.json which contains the highest-severity open
+          code scanning alert. Extract the alert number, HTML URL, rule ID, severity,
+          file path and line number, tool name, and message.
+
+          If the file is empty, null, or contains no alert, output
+          "NO_ALERT: No open code scanning alerts found." and stop.
+
+          Read the affected source file. If the issue described in the alert is
+          already fixed in the current code, output
+          "ALREADY_FIXED: <rule-id> in <file>:<line> is already resolved." and stop.
+
+          Otherwise, apply the fix:
+          - **CodeQL alerts:** Apply the minimal code change. Follow the project's
+            code style. Use the suggested fix pattern if one is provided.
+          - **Dependency alerts (Trivy / OSV-Scanner):** Upgrade the vulnerable
+            dependency to a patched version. If inherited from a parent BOM, add
+            an explicit version override in `pom.xml`.
+
+          Do NOT commit or run tests yet.
+
+    - agent:
+        prompt: |
+          Verify the fix from the previous step:
+
+          1. Identify the project's build tool, test runner, and linter from the
+             repo config files.
+          2. Compile the project. If it fails, read the errors, fix them, and retry.
+          3. Find all test suites and verification commands that could exercise the
+             modified code. Run them.
+          4. If any check fails, determine whether the failure is caused by your
+             change or is pre-existing. Fix what you broke and rerun.
+          5. Repeat until all checks pass.
+
+    - pullRequest:
+        branch: codescan-fix/
+        title: 'CodeScan-Fix: '
+        description: |
+          ## Code Scanning Alert
+
+          | Field | Value |
+          |-------|-------|
+          | **Alert** | [View alert](<alert-html-url>) |
+          | **Rule** | `<rule-id>` |
+          | **Severity** | <severity> |
+          | **Tool** | <tool-name> |
+          | **File** | `<file-path>:<line-number>` |
+          | **Message** | <alert-message> |
+
+          ## What changed
+
+          <one-or-two-sentence explanation of the fix and why it resolves the alert>
+
+          ## Verification
+
+          <List each build, test, and lint command that was run and its outcome.>
