@@ -12,6 +12,10 @@ The result is a PR that is ready to review and merge, not a starting point that 
 
 This repo demonstrates the setup using [Spring PetClinic](https://github.com/spring-projects/spring-petclinic) (Java/Maven) with GitHub's free security features.
 
+## Demo
+
+[![Watch the demo](video.jpg)](https://www.loom.com/share/7bc817ff51274739811472af06e351fd)
+
 ## Security scanning tools
 
 All tools below are free for public repos on GitHub's free org plan.
